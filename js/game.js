@@ -79,6 +79,8 @@
     var regenerativeArea;
     var lastRegion;
 
+    var trees;
+
     function create() {
         game.physics.startSystem(Phaser.Physics.ARCADE);
         game.world.setBounds(0, 0, 2000, 2000);
@@ -98,12 +100,15 @@
         game.camera.follow(player);
 
 
-        screenArea = new Phaser.Rectangle(-game.width,-game.height,game.width,game.height).scale(.5);
+        screenArea = new Phaser.Rectangle(0,0,game.width,game.height);
         protectedArea = screenArea.clone().scale(2);
         regenerativeArea = protectedArea.clone().scale(2);
         lastRegion = screenArea.clone().scale(.5);
 
         lastRegion.centerOn(player.body.position.x, player.body.position.y);
+
+        trees = game.add.group();
+
     }
 
     function update() {
@@ -122,8 +127,35 @@
         if(!Phaser.Rectangle.intersects(lastRegion, player)){
             console.log("Regenerate");
             lastRegion.centerOn(player.body.position.x, player.body.position.y);
+            regenerateTrees();
         }
     }
+
+
+    function regenerateTrees(){
+        protectedArea.centerOn(player.x, player.y);
+        regenerativeArea.centerOn(player.x, player.y);
+
+        //Remove all trees outside of the protected region
+        var toDestroy = trees.filter(function(tree) { 
+            return !protectedArea.contains(tree.position.x,
+                                                tree.position.y); 
+        });
+        toDestroy.callAll('destroy');
+
+        //generate 50 trees with 1000 attempts
+        var generated = 0;
+        var point = new Phaser.Point();
+        for(var i = 0; i < 1000 && generated < 50; i++){
+            regenerativeArea.random(point);
+            if(protectedArea.contains(point.x, point.y)) continue;
+
+            point.floor();
+            trees.create(point.x, point.y, debugTextures['treeTrunk']);
+            generated++;
+        }
+    }
+
 
     function render () {
 
