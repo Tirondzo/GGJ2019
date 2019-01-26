@@ -1,9 +1,9 @@
 (function (Phaser) {
 
 
-    var SCALE = 2;
-    var WIDTH = 480;
-    var HEIGHT = 270;
+    var SCALE = 3;
+    var WIDTH = 240;
+    var HEIGHT = 192;
 
     var game = new Phaser.Game(
             WIDTH*SCALE, HEIGHT*SCALE, 
