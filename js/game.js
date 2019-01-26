@@ -110,6 +110,22 @@
         homeBase.anchor.set(0.5);
 
         player = game.add.sprite(game.world.centerX, game.world.centerY, debugTextures['player']);
+        
+        
+        player.animations.add('right_idle',[0]);
+        player.animations.add('right',[1,1,2,3,4,4,3,2],10,true);
+        player.animations.add('right_pick',[0,5,0]);
+        player.animations.add('up_idle',[6]);
+        player.animations.add('up',[7,7,8,9,10,10,9,8],10,true);
+        player.animations.add('up_pick',[6,11,6]);
+        player.animations.add('left_idle',[12]);
+        player.animations.add('left',[13,13,14,15,16,16,15,14],10,true);
+        player.animations.add('left_pick',[12,17,12]);
+        player.animations.add('down_idle',[18]);
+        player.animations.add('down',[19,19,20,21,22,22,21,20],10,true);
+        player.animations.add('down_idle',[18,23,18]);
+        player.animations.add('sleep',[18,25],5,true);
+        
         game.physics.enable(player, Phaser.Physics.ARCADE);
         game.camera.follow(player);
 
