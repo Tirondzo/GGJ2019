@@ -47,9 +47,15 @@
         Phaser.Canvas.setImageRenderingCrisp(game.canvas);
 		
 		
-	    game.load.image('back', 'assets/back.png');
-        game.load.image('coin', 'assets/coin.png');
-
+	//game.load.image('back', 'assets/back.png');
+        //game.load.image('coin', 'assets/coin.png');
+        game.load.image('grass', 'assets/grass.png');
+        game.load.spritesheet('cat', 'assets/cat.png',16,16);
+        game.load.spritesheet('tree', 'assets/trees.png',16,32);
+        game.load.spritesheet('pickup', 'assets/pickup.png',16,16);
+        game.load.image('roof', 'assets/roof.png');
+        game.load.image('room', 'assets/room.png');
+        game.load.spritesheet('pickup_hud', 'assets/pickup_hud.png',16,16);
         //generate debug textures
         var graphics;
 
