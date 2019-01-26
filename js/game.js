@@ -47,7 +47,7 @@
         Phaser.Canvas.setImageRenderingCrisp(game.canvas);
 		
 		
-	//game.load.image('back', 'assets/back.png');
+	    //game.load.image('back', 'assets/back.png');
         //game.load.image('coin', 'assets/coin.png');
         game.load.image('grass', 'assets/grass.png');
         game.load.spritesheet('cat', 'assets/cat.png',16,16);
@@ -57,6 +57,8 @@
         game.load.image('room', 'assets/room.png');
         game.load.spritesheet('pickup_hud', 'assets/pickup_hud.png',16,16);
         game.load.spritesheet('player', 'assets/player.png',16,24);
+
+        game.load.spritesheet('arrows', 'assets/arrow.png', 240, 50);
         //generate debug textures
         var graphics;
 
@@ -109,6 +111,8 @@
     var wakingUp;
     var wakingDirLeft;
 
+    var arrows;
+
     function create() {
         //game.physics.startSystem(Phaser.Physics.ARCADE);
         game.world.setBounds(0, 0, 1e9, 1e9);
@@ -120,18 +124,21 @@
         wakingUp = 0.0;
         wakingDirLeft = true;
 
-        ground = game.add.tileSprite(game.world.centerX-1e3,game.world.centerY-1e3,1e6,1e6,'grass');
+        ground = game.add.tileSprite(game.world.centerX-1e7/2,game.world.centerY-1e7/2,1e7,1e7,'grass');
+
+        homeBase = game.add.sprite(game.world.centerX, game.world.centerY, 'room');
+        homeBase.anchor.set(0.5);
 
         homeRoof = game.add.sprite(game.world.centerX, game.world.centerY, 'roof');
         homeRoof.anchor.set(0.5);
         homeRoof.alpha = 0;
 
-        homeBase = game.add.sprite(game.world.centerX, game.world.centerY, debugTextures['homeBase']);
-        homeBase.anchor.set(0.5);
-
-        player = game.add.sprite(game.world.centerX - 45, game.world.centerY - 45, 'player');
+        player = game.add.sprite(game.world.centerX - 45, game.world.centerY + 10, 'player');
         screenFill = game.add.sprite(0,0,debugTextures['scFill']);
         screenFill.fixedToCamera = true;
+
+        arrows = game.add.sprite(game.centerX, game.height-50, 'arrows');
+        arrows.fixedToCamera = true;
 
         playerFrameSpeed = 8;
 
@@ -236,7 +243,9 @@
             if(wakingUp > 100){
                 sleeping = false;
                 screenFill.alpha = 0;
+                arrows.alpha = 0;
             }
+            arrows.frame = wakingDirLeft ? 1 : 0;
         }
 
         if(Phaser.Rectangle.intersects(homeBase.getBounds(), player.getBounds())){
