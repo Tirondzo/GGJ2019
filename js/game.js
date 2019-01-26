@@ -21,19 +21,19 @@
     var debugTextures = {};
     var cursors;
 
-    function procGenDebugTexture(w,h,name,fill=false){
+    function procGenDebugTexture(w,h,name,fill=false,fstyle='#FF3300',sstyle='#ffd900'){
         var bmd = game.make.bitmapData(w,h);
         var ctx = bmd.ctx;
-        ctx.strokeStyle = "#ffd900";
+        ctx.strokeStyle = sstyle;
         ctx.lineWidth = 5;
         ctx.strokeRect(0,0,w,h);
 
-        ctx.fillStyle = "#FF3300";
+        ctx.fillStyle = fstyle;
         ctx.font = "10px Verdana";
         ctx.fillText(name,3,13);
         
         if(fill){
-            ctx.fillStyle = "#FF3300";
+            ctx.fillStyle = fstyle;
             ctx.fillRect(0,0,w,h);
         }
         return bmd;
@@ -56,6 +56,7 @@
         game.load.image('roof', 'assets/roof.png');
         game.load.image('room', 'assets/room.png');
         game.load.spritesheet('pickup_hud', 'assets/pickup_hud.png',16,16);
+        game.load.spritesheet('player', 'assets/player.png',16,24);
         //generate debug textures
         var graphics;
 
@@ -77,9 +78,13 @@
         //Food
         debugTextures['food'] = procGenDebugTexture(30,30,"F");
 
+        //BLANK FILL BG
+        debugTextures['scFill'] = procGenDebugTexture(game.width,game.height,'',true,'#000000');
+
         cursors = this.input.keyboard.createCursorKeys();
     }
 
+    var ground;
     var player;
     var homeRoof, homeBase;
 
@@ -88,43 +93,62 @@
         regenerativeArea,
         lastRegion;
 
-    var debugScreenArea;
+    var homeArea;
+    var homePoint;
+
+    var debugScreenArea,
         debugProtectedArea,
         debugRegenerativeArea;
 
     var trees,
         items;
 
+    var screenFill;
+
+    var sleeping;
+    var wakingUp;
+    var wakingDirLeft;
+
     function create() {
-        game.physics.startSystem(Phaser.Physics.ARCADE);
+        //game.physics.startSystem(Phaser.Physics.ARCADE);
         game.world.setBounds(0, 0, 1e9, 1e9);
         game.stage.backgroundColor = "#EEEEEE";
         //game.add.sprite(0, 0, 'back');
         game.add.sprite(10, 10, 'coin');
+        
+        sleeping = true;
+        wakingUp = 0.0;
+        wakingDirLeft = true;
 
-        homeRoof = game.add.sprite(game.world.centerX, game.world.centerY, debugTextures['homeRoof']);
+        ground = game.add.tileSprite(game.world.centerX-1e3,game.world.centerY-1e3,1e6,1e6,'grass');
+
+        homeRoof = game.add.sprite(game.world.centerX, game.world.centerY, 'roof');
         homeRoof.anchor.set(0.5);
         homeRoof.alpha = 0;
 
         homeBase = game.add.sprite(game.world.centerX, game.world.centerY, debugTextures['homeBase']);
         homeBase.anchor.set(0.5);
 
-        player = game.add.sprite(game.world.centerX, game.world.centerY, debugTextures['player']);
-        
-        
+        player = game.add.sprite(game.world.centerX - 45, game.world.centerY - 45, 'player');
+        screenFill = game.add.sprite(0,0,debugTextures['scFill']);
+        screenFill.fixedToCamera = true;
+
+        playerFrameSpeed = 8;
+
         player.animations.add('right_idle',[0]);
-        player.animations.add('right',[1,1,2,3,4,4,3,2],10,true);
+        player.animations.add('right',[1,1,2,3,4,4,3,2],playerFrameSpeed,true);
         player.animations.add('right_pick',[0,5,0]);
         player.animations.add('up_idle',[6]);
-        player.animations.add('up',[7,7,8,9,10,10,9,8],10,true);
+        player.animations.add('up',[7,7,8,9,10,10,9,8],playerFrameSpeed,true);
         player.animations.add('up_pick',[6,11,6]);
         player.animations.add('left_idle',[12]);
-        player.animations.add('left',[13,13,14,15,16,16,15,14],10,true);
+        player.animations.add('left',[13,13,14,15,16,16,15,14],playerFrameSpeed,true);
         player.animations.add('left_pick',[12,17,12]);
         player.animations.add('down_idle',[18]);
-        player.animations.add('down',[19,19,20,21,22,22,21,20],10,true);
-        player.animations.add('down_idle',[18,23,18]);
+        player.animations.add('down',[19,19,20,21,22,22,21,20],playerFrameSpeed,true);
+        player.animations.add('down_pick',[18,23,18]);
         player.animations.add('sleep',[18,25],5,true);
+        
         
         game.physics.enable(player, Phaser.Physics.ARCADE);
         game.camera.follow(player);
@@ -140,20 +164,80 @@
         trees = game.add.group();
         items = game.add.group();
 
+        homePoint = new Phaser.Point(game.world.centerX, game.world.centerY);
+        homeArea = new Phaser.Rectangle(0,0,300,300).centerOn(homePoint);
 
         debugScreenArea = screenArea.clone().centerOn(game.world.centerX, game.world.centerY);
         debugProtectedArea = protectedArea.clone().centerOn(game.world.centerX, game.world.centerY);
         debugRegenerativeArea = regenerativeArea.clone().centerOn(game.world.centerX, game.world.centerY);
+    
+        player.animations.play('sleep');
     }
 
+    var lastDirection = 0;
+    var pressedL = false;
+    var pressedR = false;
     function update() {
-        if(cursors.left.isDown) player.body.velocity.x = -100;
-        else if(cursors.right.isDown) player.body.velocity.x = +100;
-        else player.body.velocity.x = 0;
+        if(!sleeping){
+            if(cursors.left.isDown){ 
+                player.body.velocity.x = -100;
+            }else if(cursors.right.isDown){
+                player.body.velocity.x = +100;
+            }else{ 
+                player.body.velocity.x = 0;
+            }
+            
+            if(cursors.down.isDown){
+                player.body.velocity.y = +100;
+            }else if(cursors.up.isDown){ 
+                player.body.velocity.y = -100;
+            }else{ 
+                player.body.velocity.y = 0;
+            }
 
-        if(cursors.down.isDown) player.body.velocity.y = +100;
-        else if(cursors.up.isDown) player.body.velocity.y = -100;
-        else player.body.velocity.y = 0;
+            if(cursors.left.isDown){
+                lastDirection = 0;
+                player.animations.play('left');
+            }else if(cursors.right.isDown){
+                lastDirection = 2;
+                player.animations.play('right');
+            }else if(cursors.up.isDown){
+                lastDirection = 1;
+                player.animations.play('up');
+            }else if(cursors.down.isDown){
+                lastDirection = 3;
+                player.animations.play('down');
+            }else{
+                player.animations.play(['left_idle','up_idle','right_idle','down_idle'][lastDirection]);
+            }
+        }else{
+            if(cursors.left.isDown){
+                if(!pressedL)
+                if(wakingDirLeft){
+                    wakingUp+=10;
+                    wakingDirLeft ^= true;
+                }else{
+                    //wakingUp *= .5;
+                }
+                pressedL = true;
+            }else if(cursors.right.isDown){
+                if(!pressedR)
+                if(!wakingDirLeft){
+                    wakingUp+=10;
+                    wakingDirLeft ^= true;
+                }else{
+                    //wakingUp *= .5;
+                }
+                pressedR = true;
+            }else pressedL = pressedR = false;
+            wakingUp *= .99;
+
+            screenFill.alpha = Phaser.Math.max(0,(100-wakingUp)/100 );
+            if(wakingUp > 100){
+                sleeping = false;
+                screenFill.alpha = 0;
+            }
+        }
 
         if(Phaser.Rectangle.intersects(homeBase.getBounds(), player.getBounds())){
             homeRoof.alpha = homeRoof.alpha + (0-homeRoof.alpha)*.28;
@@ -174,31 +258,35 @@
 
         //Remove all trees outside of the protected region
         var toDestroy = trees.filter(function(tree) { 
-            return !protectedArea.contains(tree.position.x,
-                                                tree.position.y); 
+            return !protectedArea.contains(tree.x, tree.y)
+                    || homeArea.contains(tree.x, tree.y); 
         });
         toDestroy.callAll('destroy');
         toDestroy = items.filter(function(item) { 
-            return !protectedArea.contains(item.position.x,
-                                                item.position.y); 
+            return !protectedArea.contains(item.x, item.y)
+                    || homeArea.contains(item.x, item.y); 
         });
         toDestroy.callAll('destroy');
 
         //generate 50 trees with 1000 attempts
         var generated = 0;
         var point = new Phaser.Point();
-        for(var i = 0; i < 1000 && generated < 100; i++){
+        for(var i = 0; i < 1000 && generated < 200; i++){
             regenerativeArea.random(point);
-            if(protectedArea.contains(point.x, point.y)) continue;
-            if(trees.getAll(this).some(function(tree){ return Phaser.Math.distanceSq(tree.x,tree.y,point.x,point.y) < 50*50; })){
+            if(protectedArea.contains(point.x, point.y) 
+                || homeArea.contains(point.x, point.y)) continue;
+           
+            /*if(trees.getAll(this).some(function(tree){ return Phaser.Math.distanceSq(tree.x,tree.y,point.x,point.y) < 30*30; })){
                 //console.log("2 near");
                 continue;
-            }
+            }*/
 
             //point.multiply(1/32,1/32);
             point.floor();
             //point.multiply(32,32);
-            trees.create(point.x, point.y, debugTextures['treeTrunk']);
+            var tree = trees.create(point.x, point.y, 'tree');
+            tree.frame = game.rnd.integerInRange(0,3);
+
             generated++;
         }
 
@@ -207,21 +295,23 @@
         var point = new Phaser.Point();
         for(var i = 0; i < 10 && generated < 1000; i++){
             regenerativeArea.random(point);
-            if(protectedArea.contains(point.x, point.y)) continue;
-            if(trees.getAll(this).some(function(tree){ return Phaser.Math.distanceSq(tree.x,tree.y,point.x,point.y) < 30*30; })){
+            if(protectedArea.contains(point.x, point.y) 
+                || homeArea.contains(point.x, point.y)) continue;
+            /*if(trees.getAll(this).some(function(tree){ return Phaser.Math.distanceSq(tree.x,tree.y,point.x,point.y) < 30*30; })){
                 //console.log("2 near");
                 continue;
             }
             if(items.getAll(this).some(function(item){ return Phaser.Math.distanceSq(item.x,item.y,point.x,point.y) < 30*30; })){
                 //console.log("2 near");
                 continue;
-            }
+            }*/
 
             //point.multiply(1/16,1/16);
             point.floor();
             //point.multiply(16,16);
             
-            items.create(point.x, point.y, debugTextures['food']);
+            items.create(point.x, point.y, 'pickup');
+            items.frame = game.rnd.integerInRange(0,3)*3;
             generated++;
         }
     }
@@ -235,6 +325,8 @@
         game.debug.geom(debugRegenerativeArea,'#0fffff',false);
         game.debug.text("Foods: " + items.length, 10, 10);
         game.debug.text("Trees: " + trees.length, 10, 30);
+        game.debug.text("Waking up: " + wakingUp, 10, 50);
+        game.debug.text("Waking dir: " + wakingDirLeft, 10, 70);
     }
 
 }(Phaser));
