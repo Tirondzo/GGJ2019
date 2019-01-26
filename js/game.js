@@ -68,22 +68,30 @@
         //Player
         debugTextures['player'] = procGenDebugTexture(10,20,"",true);
 
+        //Food
+        debugTextures['food'] = procGenDebugTexture(30,30,"F");
+
         cursors = this.input.keyboard.createCursorKeys();
     }
 
     var player;
     var homeRoof, homeBase;
 
-    var screenArea;
-    var protectedArea;
-    var regenerativeArea;
-    var lastRegion;
+    var screenArea,
+        protectedArea,
+        regenerativeArea,
+        lastRegion;
 
-    var trees;
+    var debugScreenArea;
+        debugProtectedArea,
+        debugRegenerativeArea;
+
+    var trees,
+        items;
 
     function create() {
         game.physics.startSystem(Phaser.Physics.ARCADE);
-        game.world.setBounds(0, 0, 2000, 2000);
+        game.world.setBounds(0, 0, 1e9, 1e9);
         game.stage.backgroundColor = "#EEEEEE";
         //game.add.sprite(0, 0, 'back');
         game.add.sprite(10, 10, 'coin');
@@ -108,7 +116,12 @@
         lastRegion.centerOn(player.body.position.x, player.body.position.y);
 
         trees = game.add.group();
+        items = game.add.group();
 
+
+        debugScreenArea = screenArea.clone().centerOn(game.world.centerX, game.world.centerY);
+        debugProtectedArea = protectedArea.clone().centerOn(game.world.centerX, game.world.centerY);
+        debugRegenerativeArea = regenerativeArea.clone().centerOn(game.world.centerX, game.world.centerY);
     }
 
     function update() {
@@ -131,8 +144,9 @@
         }
     }
 
-
+    var regeneratedTimes = 0;
     function regenerateTrees(){
+        regeneratedTimes++;
         protectedArea.centerOn(player.x, player.y);
         regenerativeArea.centerOn(player.x, player.y);
 
@@ -142,16 +156,50 @@
                                                 tree.position.y); 
         });
         toDestroy.callAll('destroy');
+        toDestroy = items.filter(function(item) { 
+            return !protectedArea.contains(item.position.x,
+                                                item.position.y); 
+        });
+        toDestroy.callAll('destroy');
 
         //generate 50 trees with 1000 attempts
         var generated = 0;
         var point = new Phaser.Point();
-        for(var i = 0; i < 1000 && generated < 50; i++){
+        for(var i = 0; i < 1000 && generated < 100; i++){
             regenerativeArea.random(point);
             if(protectedArea.contains(point.x, point.y)) continue;
+            if(trees.getAll(this).some(function(tree){ return Phaser.Math.distanceSq(tree.x,tree.y,point.x,point.y) < 50*50; })){
+                //console.log("2 near");
+                continue;
+            }
 
+            //point.multiply(1/32,1/32);
             point.floor();
+            //point.multiply(32,32);
             trees.create(point.x, point.y, debugTextures['treeTrunk']);
+            generated++;
+        }
+
+        //generate 10 foods with 1000 attempts
+        var generated = 0;
+        var point = new Phaser.Point();
+        for(var i = 0; i < 10 && generated < 1000; i++){
+            regenerativeArea.random(point);
+            if(protectedArea.contains(point.x, point.y)) continue;
+            if(trees.getAll(this).some(function(tree){ return Phaser.Math.distanceSq(tree.x,tree.y,point.x,point.y) < 30*30; })){
+                //console.log("2 near");
+                continue;
+            }
+            if(items.getAll(this).some(function(item){ return Phaser.Math.distanceSq(item.x,item.y,point.x,point.y) < 30*30; })){
+                //console.log("2 near");
+                continue;
+            }
+
+            //point.multiply(1/16,1/16);
+            point.floor();
+            //point.multiply(16,16);
+            
+            items.create(point.x, point.y, debugTextures['food']);
             generated++;
         }
     }
@@ -160,7 +208,11 @@
     function render () {
 
         game.debug.geom(lastRegion,'#0fffff',false);
-    
+        game.debug.geom(debugScreenArea,'#0fffff',false);
+        game.debug.geom(debugProtectedArea,'#0fffff',false);
+        game.debug.geom(debugRegenerativeArea,'#0fffff',false);
+        game.debug.text("Foods: " + items.length, 10, 10);
+        game.debug.text("Trees: " + trees.length, 10, 30);
     }
 
 }(Phaser));
