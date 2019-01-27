@@ -93,6 +93,11 @@
 
     var ground;
     var player;
+    var cat;
+    var catAnim;
+    var catMoving = false;
+    var catLastMove = 0;
+
     var reciept;
     var homeGroup = new Array();
     var homeRoof, homeBase;
@@ -103,6 +108,7 @@
         lastRegion;
 
     var homeArea;
+    var foodRestrictArea;
     var homePoint;
 
     var debugScreenArea,
@@ -142,20 +148,40 @@
 
         //HOME
         homePoint = new Phaser.Point(game.world.centerX, game.world.centerY);
-        homeArea = new Phaser.Rectangle(0,0,300,300).centerOn(homePoint);
+        homeArea = new Phaser.Rectangle(0,0,300,300).centerOn(homePoint.x, homePoint.y);
+
+        foodRestrictArea = homeArea.clone().scale(3).centerOn(homePoint.x, homePoint.y);
+
+        //var roomArea = new Phaser.Rectangle(0,0,120,33).centerOn(homePoint.x,homePoint.y+128/2-33/2);
+        //game.world.setBounds(roomArea.x,roomArea.y,roomArea.width,roomArea.height);
 
         homeBase = sortableGroup.create(homePoint.x, homePoint.y, 'room');
         homeBase.anchor.set(0.5,98/128);
 
-        homeRoof = sortableGroup.create(homePoint.x, homePoint.y, 'roof');
-        homeRoof.anchor.set(0.5,98/128);
+        homeRoof = sortableGroup.create(homePoint.x, homePoint.y + (128-98), 'roof');
+        homeRoof.anchor.set(0.5,1);
         homeRoof.alpha = 0;
         homeGroup.push(homeBase);
         homeGroup.push(homeRoof);
 
-        player = sortableGroup.create(homePoint.x - 45, homePoint.y + 10, 'player');
+        //PLAYER
+        player = sortableGroup.create(homePoint.x - 32, homePoint.y + 19, 'player');
         player.anchor.set(0.5,1);
+        //player.enableBody = true;
+          
+        game.physics.enable(player, Phaser.Physics.ARCADE);
+        game.camera.follow(player);
+        //player.body.collideWorldBounds = true;
 
+
+        //CAT
+        cat = sortableGroup.create(homePoint.x-7, homePoint.y+14, 'cat');
+        cat.anchor.set(0,1);
+        //catAnim = game.add.tween(cat);
+        game.physics.enable(cat, Phaser.Physics.ARCADE);
+        
+
+        //RECIEPT ITEM
         reciept = sortableGroup.create(homePoint.x + 17, homePoint.y - 10 + 10, 'reciept_item');
         reciept.anchor.set(0,1);
 
@@ -169,6 +195,7 @@
         recieptLarge.fixedToCamera = true;
         recieptLarge.visible = false;
 
+        //HUD
         hud = game.add.group();
         hud.fixedToCamera = true;
         hud.create(10,10,'pickup_hud');
@@ -185,7 +212,8 @@
         hud.add(hud_text[3]);
         hud.visible = false;
 
-        playerFrameSpeed = 8;
+        //Player ANIMATIONS
+        var playerFrameSpeed = 8;
 
         player.animations.add('right_idle',[0]);
         player.animations.add('right',[1,1,2,3,4,4,3,2],playerFrameSpeed,true);
@@ -200,11 +228,17 @@
         player.animations.add('down',[19,19,20,21,22,22,21,20],playerFrameSpeed,true);
         player.animations.add('down_pick',[18,23,18],playerFrameSpeed);
         player.animations.add('sleep',[24,25],5,true);
-        
-        
-        game.physics.enable(player, Phaser.Physics.ARCADE);
-        game.camera.follow(player);
 
+        var catFrameSpeed = 4;
+        cat.animations.add('idle', [0,1], catFrameSpeed, true);
+        cat.animations.add('idle_hover', [2,3], catFrameSpeed, true);
+        cat.animations.add('right', [4,5], catFrameSpeed, true);
+        cat.animations.add('up', [6,7], catFrameSpeed, true);
+        cat.animations.add('left', [8,9], catFrameSpeed, true);
+        cat.animations.add('down', [10,11], catFrameSpeed, true);
+        cat.animations.add('sleep', [12,13], catFrameSpeed, true);
+        
+        
 
         screenArea = new Phaser.Rectangle(0,0,game.width,game.height);
         protectedArea = screenArea.clone().scale(2);
@@ -218,6 +252,7 @@
         debugRegenerativeArea = regenerativeArea.clone().centerOn(game.world.centerX, game.world.centerY);
     
         player.animations.play('sleep');
+        cat.animations.play('sleep');
     }
 
     var lastDirection = 0;
@@ -229,6 +264,8 @@
 
     var picking = false;
     var pickingTime = 0;
+
+    var gameStage = 0;
 
     function update() {
         //PICKING DISABLE
@@ -296,6 +333,8 @@
                 sleeping = false;
                 screenFill.alpha = 0;
                 arrows.alpha = 0;
+                //gameStage => 1
+                gameStage += 1;
             }
             arrows.frame = wakingDirLeft ? 1 : 0;
         }
@@ -311,13 +350,23 @@
             console.log("Regenerate");
             lastRegion.centerOn(player.body.position.x, player.body.position.y);
             regenerateTrees();
-            if(regeneratedTimes > 10 && !protectedArea.contains(homePoint.x, homePoint.y))
+            if(gameStage == 2 && regeneratedTimes > 1 && pickedItems.reduce(function(a,b){return a+b}) > 0 && !regenerativeArea.contains(homePoint.x, homePoint.y)){
                 lostHome();
+            }
+
+            if(gameStage == 5){
+                if(!protectedArea.centerOn(player.x, player.y).contains(cat.x, cat.y)){
+                    findCat();
+                    //findHome();
+                } 
+            }
         }
 
         if(Phaser.Math.distanceSq(player.x,player.y,reciept.x,reciept.y+10) < 100){
             reciept.frame = 1;
-            if(spaceKey.isDown){
+            if(spaceKey.isDown && !recieptPicked){
+                //game stage => 2
+                gameStage += 1;
                 reciept.destroy();
                 recieptPicked = true;
                 recieptLarge.visible = true;
@@ -349,11 +398,44 @@
                     player.body.velocity.x = player.body.velocity.y = 0;
                     player.animations.stop();
                     player.animations.play(['left_pick','up_pick','right_pick','down_pick'][lastDirection]);
+                
+                    //If picked enough => gg mode --- gameStage => 3
+                    if(gameStage == 3)
+                    if(pickedItems.reduce(function(a,b){return a+b;}) > 1) gameStage+=1;
+
                 }else if(Phaser.Rectangle.intersects(player.getBounds(),itemHoverRect)){
                     item.frame = food_id*3+1;
                 }else{item.frame = food_id*3;}
             }
         });
+        if(gameStage == 4){
+            findHome();
+            //TODO ADD FADE OUT AND DELAY
+            gameStage = 5;
+        }
+
+        //check for cat
+        if(gameStage == 5 && !catMoving){
+            var catDistSq = Phaser.Math.distanceSq(player.x,player.y,cat.x,cat.y);
+            if(catDistSq < 20*20){
+                catLastMove = game.time.totalElapsedSeconds();
+                catMoving = true;
+                
+                //catAnim.stop();
+                var catDist = Phaser.Math.distance(homePoint.x, homePoint.y, cat.x, cat.y);
+                var dx = (homePoint.x - cat.x)/catDist * 40;
+                var dy = (homePoint.y - cat.y)/catDist * 40;
+                cat.body.velocity.x = dx;
+                cat.body.velocity.y = dy;
+                //var toX = cat.x + dx; var toY = cat.y + dy;
+                //catAnim.stop().to( { x: toX, y: toY }, 3000, Phaser.Easing.Linear.None, false).from({x:cat.x, y:cat.y}).start();
+            }
+        }else if(catMoving){
+            if(game.time.totalElapsedSeconds() - catLastMove > 1){
+                catMoving = false;
+                cat.body.velocity.x = cat.body.velocity.y = 0;
+            }
+        }
     }
 
     var isLost = false;
@@ -362,14 +444,47 @@
         homeGroup.forEach(function(val){val.visible = false;});
         homePoint.set(0,0);
         homeArea.centerOn(homePoint.x, homePoint.y);
+        foodRestrictArea.centerOn(homePoint.x, homePoint.y);
+        cat.visible = false;
+        cat.position.x = cat.position.y = 0;
+        gameStage = 3;
     }
 
     function findHome(){
-        homePoint.set(Phaser.random.frac()*Phaser.Math.PI2);
+        var angle = game.rnd.frac()*Phaser.Math.PI2;
+        homePoint.set(player.x + Math.cos(angle)*500, player.y + Math.sin(angle)*500);
+        homeArea.centerOn(homePoint.x, homePoint.y);
+        homeGroup.forEach(function(val){
+            val.visible = true; 
+            val.position.x = homePoint.x;
+            val.position.y = homePoint.y;
+        });
     }
 
+    function findCat(){
+        screenArea.centerOn(player.x,player.y);
+        cat.visible = true;
+        cat.play('idle');
+        if(Math.abs(regenDx) > Math.abs(regenDy)){
+            if(regenDx > 0){ cat.position.x = screenArea.right + 20; cat.position.y = screenArea.centerY; }
+            else{ cat.position.x = screenArea.left - 20; cat.position.y = screenArea.centerY; }
+        }else{
+            if(regenDy > 0){ cat.position.x = screenArea.centerX; cat.position.y = screenArea.bottom + 20;}
+            else{ cat.position.x = screenArea.centerX; cat.position.y = screenArea.top - 20;}
+        }
+    }
+
+    var regenOldX = 0,
+        regenDx = 0,
+        regenOldY = 0,
+        regenDy = 0;
     var regeneratedTimes = 0;
     function regenerateTrees(){
+        regenDx = player.x - regenOldX;
+        regenDy = player.y - regenOldY;
+        regenOldX = player.x;
+        regenOldY = player.y;
+
         regeneratedTimes++;
         protectedArea.centerOn(player.x, player.y);
         regenerativeArea.centerOn(player.x, player.y);
@@ -401,6 +516,8 @@
         //generate 50 trees with 1000 attempts
         var generated = 0;
         var point = new Phaser.Point();
+        var treeType = game.rnd.integerInRange(0,2);
+
         for(var i = 0; i < 1000 && generated < 200; i++){
             regenerativeArea.random(point);
             if(protectedArea.contains(point.x, point.y) 
@@ -415,7 +532,7 @@
             point.floor();
             //point.multiply(32,32);
             var tree = sortableGroup.create(point.x, point.y, 'tree');
-            tree.frame = game.rnd.integerInRange(0,3);
+            tree.frame = game.rnd.integerInRange(0,3) + treeType*4;
             tree.anchor.set(0.5,1);
             trees.push(tree);
 
@@ -429,7 +546,7 @@
         for(var i = 0; i < 10 && generated < 1000; i++){
             regenerativeArea.random(point);
             if(protectedArea.contains(point.x, point.y) 
-                || homeArea.contains(point.x, point.y)) continue;
+                || foodRestrictArea.contains(point.x, point.y)) continue;
             /*if(trees.getAll(this).some(function(tree){ return Phaser.Math.distanceSq(tree.x,tree.y,point.x,point.y) < 30*30; })){
                 //console.log("2 near");
                 continue;
@@ -463,6 +580,8 @@
         game.debug.text("Waking up: " + wakingUp, 10, 50);
         game.debug.text("Waking dir: " + wakingDirLeft, 10, 70);
         */
+
+       game.debug.text("Game Stage: " + gameStage, 10, 10);
     }
 
 }(Phaser));
