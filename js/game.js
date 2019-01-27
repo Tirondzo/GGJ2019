@@ -47,7 +47,8 @@
         game.renderer.renderSession.roundPixels = true;
         Phaser.Canvas.setImageRenderingCrisp(game.canvas);
 		
-		
+	game.load.bitmapFont('myfont', 'assets/font.png', 'assets/font.fnt');
+                
 	    //game.load.image('back', 'assets/back.png');
         //game.load.image('coin', 'assets/coin.png');
         game.load.image('grass', 'assets/grass.png');
@@ -209,13 +210,14 @@
         hud.create(50,10,'pickup_hud').frame = 1;
         hud.create(90,10,'pickup_hud').frame = 2;
         hud.create(130,10,'pickup_hud').frame = 3;
-        hud_text[0] = game.add.text(29, 12, "0", { font: '12px Arial', fill: '#fff' });
+        //hud_text[0] = game.add.text(29, 12, "0", { font: '12px Arial', fill: '#fff' });
+        hud_text[0] = game.add.bitmapText(29, 12, 'myfont', '0', 16);
         hud.add(hud_text[0]);
-        hud_text[1] = game.add.text(29+40, 12, "0", { font: '12px Arial', fill: '#fff' });
+        hud_text[1] = game.add.bitmapText(29+40, 12, 'myfont', '0', 16);
         hud.add(hud_text[1]);
-        hud_text[2] = game.add.text(29+40*2, 12, "0", { font: '12px Arial', fill: '#fff' });
+        hud_text[2] = game.add.bitmapText(29+40*2, 12, 'myfont', '0', 16);
         hud.add(hud_text[2]);
-        hud_text[3] = game.add.text(29+40*3, 12, "0", { font: '12px Arial', fill: '#fff' });
+        hud_text[3] = game.add.bitmapText(29+40*3, 12, 'myfont', '0', 16);
         hud.add(hud_text[3]);
         hud.visible = false;
 
