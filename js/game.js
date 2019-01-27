@@ -47,7 +47,7 @@
         Phaser.Canvas.setImageRenderingCrisp(game.canvas);
 		
 		
-	//game.load.image('back', 'assets/back.png');
+	    //game.load.image('back', 'assets/back.png');
         //game.load.image('coin', 'assets/coin.png');
         game.load.image('grass', 'assets/grass.png');
         game.load.spritesheet('cat', 'assets/cat.png',16,16);
@@ -57,6 +57,8 @@
         game.load.image('room', 'assets/room.png');
         game.load.spritesheet('pickup_hud', 'assets/pickup_hud.png',16,16);
         game.load.spritesheet('player', 'assets/player.png',16,24);
+
+        game.load.spritesheet('arrows', 'assets/arrow.png', 240, 50);
         //generate debug textures
         var graphics;
 
@@ -100,8 +102,8 @@
         debugProtectedArea,
         debugRegenerativeArea;
 
-    var trees,
-        items;
+    var trees = new Array()
+        items = new Array();
 
     var screenFill;
 
@@ -109,29 +111,39 @@
     var wakingUp;
     var wakingDirLeft;
 
+    var arrows;
+
+    var sortableGroup;
+
     function create() {
         //game.physics.startSystem(Phaser.Physics.ARCADE);
         game.world.setBounds(0, 0, 1e9, 1e9);
         game.stage.backgroundColor = "#EEEEEE";
-        //game.add.sprite(0, 0, 'back');
-        game.add.sprite(10, 10, 'coin');
         
         sleeping = true;
         wakingUp = 0.0;
         wakingDirLeft = true;
 
-        ground = game.add.tileSprite(game.world.centerX-1e3,game.world.centerY-1e3,1e6,1e6,'grass');
+        //Before screen
+        ground = game.add.tileSprite(game.world.centerX-1e7/2,game.world.centerY-1e7/2,1e7,1e7,'grass');
 
-        homeRoof = game.add.sprite(game.world.centerX, game.world.centerY, 'roof');
+        //Sortable
+        sortableGroup = game.add.group(game.world, 'sortable'); //sortable is just a name
+
+        homeBase = sortableGroup.create(game.world.centerX, game.world.centerY, 'room');
+        homeBase.anchor.set(0.5);
+
+        homeRoof = sortableGroup.create(game.world.centerX, game.world.centerY, 'roof');
         homeRoof.anchor.set(0.5);
         homeRoof.alpha = 0;
 
-        homeBase = game.add.sprite(game.world.centerX, game.world.centerY, debugTextures['homeBase']);
-        homeBase.anchor.set(0.5);
+        player = sortableGroup.create(game.world.centerX - 45, game.world.centerY + 10, 'player');
 
-        player = game.add.sprite(game.world.centerX - 45, game.world.centerY - 45, 'player');
+        //Over screen
         screenFill = game.add.sprite(0,0,debugTextures['scFill']);
         screenFill.fixedToCamera = true;
+        arrows = game.add.sprite(game.centerX, game.height-50, 'arrows');
+        arrows.fixedToCamera = true;
 
         playerFrameSpeed = 8;
 
@@ -161,9 +173,6 @@
 
         lastRegion.centerOn(player.body.position.x, player.body.position.y);
 
-        trees = game.add.group();
-        items = game.add.group();
-
         homePoint = new Phaser.Point(game.world.centerX, game.world.centerY);
         homeArea = new Phaser.Rectangle(0,0,300,300).centerOn(homePoint);
 
@@ -178,6 +187,7 @@
     var pressedL = false;
     var pressedR = false;
     function update() {
+        //MOVEMENT
         if(!sleeping){
             if(cursors.left.isDown){ 
                 player.body.velocity.x = -100;
@@ -236,8 +246,13 @@
             if(wakingUp > 100){
                 sleeping = false;
                 screenFill.alpha = 0;
+                arrows.alpha = 0;
             }
+            arrows.frame = wakingDirLeft ? 1 : 0;
         }
+
+
+        sortableGroup.sort('y');
 
         if(Phaser.Rectangle.intersects(homeBase.getBounds(), player.getBounds())){
             homeRoof.alpha = homeRoof.alpha + (0-homeRoof.alpha)*.28;
@@ -256,17 +271,29 @@
         protectedArea.centerOn(player.x, player.y);
         regenerativeArea.centerOn(player.x, player.y);
 
-        //Remove all trees outside of the protected region
-        var toDestroy = trees.filter(function(tree) { 
-            return !protectedArea.contains(tree.x, tree.y)
-                    || homeArea.contains(tree.x, tree.y); 
+        //Remove all trees and foods outside of the protected region
+        var removeCond = function(val){
+            return !protectedArea.contains(val.x, val.y)
+                    || homeArea.contains(val.x, val.y); 
+        }
+
+        //Remove trees
+        var newTrees = new Array();
+        trees.forEach(function(val){
+            if(removeCond(val)){
+                val.destroy();
+            }else newTrees.push(val);
         });
-        toDestroy.callAll('destroy');
-        toDestroy = items.filter(function(item) { 
-            return !protectedArea.contains(item.x, item.y)
-                    || homeArea.contains(item.x, item.y); 
+        trees = newTrees;
+        //Remove foods
+        var newItems = new Array();
+        trees.forEach(function(val){
+            if(removeCond(val)){
+                val.destroy();
+            }else newItems.push(val);
         });
-        toDestroy.callAll('destroy');
+        items = newItems;
+        
 
         //generate 50 trees with 1000 attempts
         var generated = 0;
@@ -284,8 +311,9 @@
             //point.multiply(1/32,1/32);
             point.floor();
             //point.multiply(32,32);
-            var tree = trees.create(point.x, point.y, 'tree');
+            var tree = sortableGroup.create(point.x, point.y, 'tree');
             tree.frame = game.rnd.integerInRange(0,3);
+            trees.push(tree);
 
             generated++;
         }
@@ -310,8 +338,9 @@
             point.floor();
             //point.multiply(16,16);
             
-            items.create(point.x, point.y, 'pickup');
-            items.frame = game.rnd.integerInRange(0,3)*3;
+            var item = sortableGroup.create(point.x, point.y, 'pickup');
+            item.frame = game.rnd.integerInRange(0,3)*3;
+            items.push(item);
             generated++;
         }
     }
