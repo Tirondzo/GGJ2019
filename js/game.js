@@ -5,6 +5,9 @@
     var WIDTH = 240;
     var HEIGHT = 192;
 
+    var HOME_DISTANCE = 1500;
+    var ENOUGH_FOOD = 8;
+
     var game = new Phaser.Game(
             WIDTH*SCALE, HEIGHT*SCALE, 
             Phaser.AUTO, // The type of graphic rendering to use 
@@ -41,6 +44,8 @@
     }
 
     function preload() {
+
+
         game.scale.scaleMode = Phaser.ScaleManager.USER_SCALE;
 	    game.scale.setGameSize(WIDTH,HEIGHT);
         game.scale.setUserScale(SCALE, SCALE);
@@ -65,6 +70,9 @@
 
         game.load.spritesheet('reciept_item', 'assets/recipe_small.png', 10, 10);
         game.load.image('reciept', 'assets/recipe.png');
+
+        game.load.spritesheet('fog', 'assets/fog.png', 240, 192);
+
         //generate debug textures
         var graphics;
 
@@ -122,6 +130,7 @@
         items = new Array();
 
     var screenFill;
+    var fog;
     var hud;
     var hud_text = new Array(4);
     var pickedItems = [0,0,0,0];
@@ -139,9 +148,13 @@
 
 
     function create() {
+        game.stage.scale.pageAlignHorizontally = true;
+        game.stage.scale.pageAlignVeritcally = true;
+        //game.stage.scale.refresh();
         //game.physics.startSystem(Phaser.Physics.ARCADE);
         game.world.setBounds(0, 0, 1e9, 1e9);
         game.stage.backgroundColor = "#EEEEEE";
+        game.physics.startSystem(Phaser.Physics.ARCADE);
         
         sleeping = true;
         wakingUp = 0.0;
@@ -171,16 +184,21 @@
         homeGroup.push(homeBase);
         homeGroup.push(homeRoof);
 
+        
+        //var inv = game.add.sprite(homePoint.x,homePoint.y, procGenDebugTexture(30,30,'',true));
+        //inv.body.setSize(30,30,35,35);
+
         //PLAYER
         player = sortableGroup.create(homePoint.x - 32, homePoint.y + 19, 'player');
         player.anchor.set(0.5,1);
-        //player.enableBody = true;
-          
-        game.physics.enable(player, Phaser.Physics.ARCADE);
-        game.camera.follow(player);
+        //game.physics.enable(player, Phaser.Physics.ARCADE);
+        //player.body.setSize(30,30,35,35);
+       
+        game.camera.focusOn(player);
         //player.body.collideWorldBounds = true;
 
-        
+        game.physics.enable([player,sortableGroup], Phaser.Physics.ARCADE);
+        //inv.body.immovable = true;
 
         //CAT
         cat = sortableGroup.create(homePoint.x-7, homePoint.y+14, 'cat');
@@ -220,6 +238,10 @@
         hud_text[3] = game.add.bitmapText(29+40*3, 12, 'myfont', '0', 16);
         hud.add(hud_text[3]);
         hud.visible = false;
+
+        fog = game.add.sprite(0,0,'fog');
+        fog.fixedToCamera = true;
+        fog.frame = 0;
 
         //Player ANIMATIONS
         var playerFrameSpeed = 8;
@@ -291,6 +313,9 @@
     var pickingTime = 0;
 
     var gameStage = 0;
+    var depressionTime = 0;
+
+    var atHomeTime = 0;
 
     function update() {
         //PICKING DISABLE
@@ -373,7 +398,7 @@
         }else homeRoof.alpha = homeRoof.alpha + (1-homeRoof.alpha)*.18;
 
         if(!Phaser.Rectangle.intersects(lastRegion, player)){
-            console.log("Regenerate");
+            //console.log("Regenerate");
             lastRegion.centerOn(player.body.position.x, player.body.position.y);
             regenerateTrees();
             if(gameStage == 2 && regeneratedTimes > 1 && pickedItems.reduce(function(a,b){return a+b}) > 0 && !regenerativeArea.contains(homePoint.x, homePoint.y)){
@@ -392,6 +417,7 @@
             reciept.frame = 1;
             if(spaceKey.isDown && !recieptPicked){
                 //game stage => 2
+                game.camera.follow(player);
                 gameStage += 1;
                 reciept.destroy();
                 recieptPicked = true;
@@ -425,11 +451,16 @@
                     player.animations.stop();
                     player.animations.play(['left_pick','up_pick','right_pick','down_pick'][lastDirection]);
                 
+                    if(gameStage < 5)
                     if (!bubble.visible && Math.floor(Math.random()*2)===1) {bubble_follow=player; bubble.visible=true;bubble.animations.play('happy');}
                 
                     //If picked enough => gg mode --- gameStage => 3
-                    if(gameStage == 3)
-                    if(pickedItems.reduce(function(a,b){return a+b;}) > 1) gameStage+=1;
+                    if(gameStage == 3){
+                        if(pickedItems.reduce(function(a,b){return a+b;}) > ENOUGH_FOOD){
+                            gameStage+=1;
+                            depressionTime = game.time.totalElapsedSeconds();
+                        }
+                    }
 
                 }else if(Phaser.Rectangle.intersects(player.getBounds(),itemHoverRect)){
                     item.frame = food_id*3+1;
@@ -439,7 +470,19 @@
         if(gameStage == 4){
             findHome();
             //TODO ADD FADE OUT AND DELAY
-            gameStage = 5;
+            //gameStage = 5;
+
+            var inDepression = game.time.totalElapsedSeconds() - depressionTime;
+            var depressionPhase = Math.min(Math.ceil(inDepression/2),6);
+            fog.frame = depressionPhase;
+            if(depressionPhase == 6){
+                gameStage = 5;
+            }
+        }
+        if(gameStage == 5){
+            var dist = Phaser.Math.distance(player.x,player.y,homePoint.x-7,homePoint.y+14);
+            var depressionPhase = Math.min(6, Math.ceil(dist/(HOME_DISTANCE/6)));
+            fog.frame = depressionPhase;
         }
 
         //check for cat
@@ -484,10 +527,23 @@
         }
 
         if(gameStage == 5){
+            hud.visible = false;
             if(Phaser.Math.distanceSq(player.x,player.y,homePoint.x-7,homePoint.y+14) < 400){
                 gameStage = 6;
                 player.body.velocity.x = player.body.velocity.y = 0;
+                atHomeTime = game.time.totalElapsedSeconds();
             }
+        }
+        if(gameStage == 6){
+            fog.frame = 0;
+            if (!bubble.visible) {bubble_follow=cat; bubble.visible=true;bubble.animations.play('love');}
+            if(game.time.totalElapsedSeconds() - atHomeTime > 3){
+                gameStage = 7;
+            }
+        }
+
+        if(gameStage == 7){
+            screenFill.alpha += (1-screenFill.alpha) * .09;
         }
         
         
@@ -502,6 +558,10 @@
             if (!bubble.visible) {bubble_follow=player; bubble.visible=true;bubble.animations.play('zzz');}
             }
 
+        if (gameStage==4 && Math.floor(Math.random()*60*2)===1)
+        {
+        if (!bubble.visible) {bubble_follow=player; bubble.visible=true;bubble.animations.play('scared');}
+        }
         
         
         if (bubble_follow!=null)
@@ -525,7 +585,7 @@
 
     function findHome(){
         var angle = game.rnd.frac()*Phaser.Math.PI2;
-        homePoint.set(player.x + Math.cos(angle)*500, player.y + Math.sin(angle)*500);
+        homePoint.set(player.x + Math.cos(angle)*HOME_DISTANCE, player.y + Math.sin(angle)*HOME_DISTANCE);
         homeArea.centerOn(homePoint.x, homePoint.y);
         homeBase.position.set(homePoint.x, homePoint.y);
         homeRoof.position.set(homePoint.x, homePoint.y + (128-98));
@@ -591,7 +651,9 @@
         var point = new Phaser.Point();
         var treeType = game.rnd.integerInRange(0,2);
 
-        for(var i = 0; i < 1000 && generated < 200; i++){
+        var genNewTrees = Math.max(50, Math.min(200, pickedItems.reduce(function(a,b){return a+b;})/ENOUGH_FOOD*200));
+
+        for(var i = 0; i < 1000 && generated < genNewTrees; i++){
             regenerativeArea.random(point);
             if(protectedArea.contains(point.x, point.y) 
                 || homeArea.contains(point.x, point.y)) continue;
@@ -654,7 +716,7 @@
         game.debug.text("Waking dir: " + wakingDirLeft, 10, 70);
         */
 
-       game.debug.text("Game Stage: " + gameStage, 10, 10);
+       //game.debug.text("Game Stage: " + gameStage, 10, 10);
     }
 
 }(Phaser));
