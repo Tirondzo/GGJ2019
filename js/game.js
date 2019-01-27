@@ -5,7 +5,7 @@
     var WIDTH = 240;
     var HEIGHT = 192;
 
-    var HOME_DISTANCE = 1500;
+    var HOME_DISTANCE = 1000;
     var ENOUGH_FOOD = 8;
 
     var game = new Phaser.Game(
@@ -72,6 +72,7 @@
         game.load.image('reciept', 'assets/recipe.png');
 
         game.load.spritesheet('fog', 'assets/fog.png', 240, 192);
+        game.load.image('end', 'assets/end.png');
 
         //generate debug textures
         var graphics;
@@ -132,6 +133,7 @@
     var screenFill;
     var fog;
     var hud;
+    var endImg;
     var hud_text = new Array(4);
     var pickedItems = [0,0,0,0];
 
@@ -194,7 +196,7 @@
         //game.physics.enable(player, Phaser.Physics.ARCADE);
         //player.body.setSize(30,30,35,35);
        
-        game.camera.focusOn(player);
+
         //player.body.collideWorldBounds = true;
 
         game.physics.enable([player,sortableGroup], Phaser.Physics.ARCADE);
@@ -242,6 +244,10 @@
         fog = game.add.sprite(0,0,'fog');
         fog.fixedToCamera = true;
         fog.frame = 0;
+
+        endImg = game.add.sprite(0,0,'end');
+        endImg.fixedToCamera = true;
+        endImg.visible = false;
 
         //Player ANIMATIONS
         var playerFrameSpeed = 8;
@@ -300,6 +306,10 @@
         
         bubble.visible=false;
 
+
+        reciept.animations.add('blink',[0,1],3,true);
+        reciept.animations.play('blink');
+        game.camera.focusOn(reciept);
     }
 
     var lastDirection = 0;
@@ -414,8 +424,11 @@
         }
 
         if(Phaser.Math.distanceSq(player.x,player.y,reciept.x,reciept.y+10) < 100){
-            reciept.frame = 1;
-            if(spaceKey.isDown && !recieptPicked){
+            //reciept.frame = 1;
+            if( !recieptPicked){
+                pickingTime = game.time.totalElapsedSeconds();
+                picking = true;
+                player.body.velocity.set(0,0);
                 //game stage => 2
                 game.camera.follow(player);
                 gameStage += 1;
@@ -424,7 +437,7 @@
                 recieptLarge.visible = true;
                 recieptPoint = new Phaser.Point(player.x, player.y);
             }
-        }else reciept.frame = 0;
+        }
         if(recieptPicked && recieptShow){
             var dist = Phaser.Math.distanceSq(player.x,player.y,recieptPoint.x,recieptPoint.y);
             recieptLarge.alpha = Phaser.Math.max(0, (400-dist)/400);
@@ -436,6 +449,7 @@
         }
 
         //Check for foods picking
+        if(gameStage < 5)
         items.forEach(function(item){
             if(item.frame%3 != 2){
                 var itemPickRect = item.getBounds();
@@ -451,7 +465,7 @@
                     player.animations.stop();
                     player.animations.play(['left_pick','up_pick','right_pick','down_pick'][lastDirection]);
                 
-                    if(gameStage < 5)
+                    if(gameStage < 4)
                     if (!bubble.visible && Math.floor(Math.random()*2)===1) {bubble_follow=player; bubble.visible=true;bubble.animations.play('happy');}
                 
                     //If picked enough => gg mode --- gameStage => 3
@@ -539,11 +553,14 @@
             if (!bubble.visible) {bubble_follow=cat; bubble.visible=true;bubble.animations.play('love');}
             if(game.time.totalElapsedSeconds() - atHomeTime > 3){
                 gameStage = 7;
+                endImg.alpha = 0;
             }
         }
 
         if(gameStage == 7){
             screenFill.alpha += (1-screenFill.alpha) * .09;
+            endImg.alpha += (1-endImg.alpha) * .09;
+            endImg.visible = true;
         }
         
         
