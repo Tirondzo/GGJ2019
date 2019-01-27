@@ -59,6 +59,7 @@
         game.load.spritesheet('pickup_hud', 'assets/pickup_hud2.png',16,16);
         game.load.spritesheet('player', 'assets/player.png',16,24);
 
+        game.load.spritesheet('bubble','assets/bubble.png',16,16)
         game.load.spritesheet('arrows', 'assets/arrow.png', 240, 50);
 
         game.load.spritesheet('reciept_item', 'assets/recipe_small.png', 10, 10);
@@ -130,6 +131,10 @@
     var arrows;
 
     var sortableGroup;
+    
+    var bubble_follow = null;
+
+
 
     function create() {
         //game.physics.startSystem(Phaser.Physics.ARCADE);
@@ -173,6 +178,7 @@
         game.camera.follow(player);
         //player.body.collideWorldBounds = true;
 
+        
 
         //CAT
         cat = sortableGroup.create(homePoint.x-7, homePoint.y+14, 'cat');
@@ -253,6 +259,22 @@
     
         player.animations.play('sleep');
         cat.animations.play('sleep');
+        
+        
+        bubble = game.add.sprite(0,0,'bubble');
+        bubbleSpeed = 15;
+        bubble.animations.add('zzz',[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14],bubbleSpeed);
+        bubble.animations.add('happy',[15,16,17,18,19,20,21,22,23,24,25,26,27,28,29],bubbleSpeed);
+        bubble.animations.add('scared',[30,31,32,33,34,35,36,37,38,39,40,41,42,43,44],bubbleSpeed);
+        bubble.animations.add('love',[45,46,47,48,49,50,51,52,53,54,55,56,57,58,59],bubbleSpeed);
+        bubble.animations.getAnimation('zzz').onComplete.add(function () { bubble.visible=false; }, this);
+        bubble.animations.getAnimation('happy').onComplete.add(function () { bubble.visible=false; }, this);
+        bubble.animations.getAnimation('scared').onComplete.add(function () { bubble.visible=false; }, this);
+        bubble.animations.getAnimation('love').onComplete.add(function () { bubble.visible=false; }, this);
+        
+        
+        bubble.visible=false;
+
     }
 
     var lastDirection = 0;
@@ -399,6 +421,8 @@
                     player.animations.stop();
                     player.animations.play(['left_pick','up_pick','right_pick','down_pick'][lastDirection]);
                 
+                    if (!bubble.visible && Math.floor(Math.random()*2)===1) {bubble_follow=player; bubble.visible=true;bubble.animations.play('happy');}
+                
                     //If picked enough => gg mode --- gameStage => 3
                     if(gameStage == 3)
                     if(pickedItems.reduce(function(a,b){return a+b;}) > 1) gameStage+=1;
@@ -436,6 +460,26 @@
                 cat.body.velocity.x = cat.body.velocity.y = 0;
             }
         }
+        
+        
+        
+        if (gameStage<2 && Math.floor(Math.random()*2)===1)
+            {
+            if (!bubble.visible) {bubble_follow=cat; bubble.visible=true;bubble.animations.play('zzz');}
+            } 
+        
+        if (gameStage==0)
+            {
+            if (!bubble.visible) {bubble_follow=player; bubble.visible=true;bubble.animations.play('zzz');}
+            }
+
+        
+        
+        if (bubble_follow!=null)
+            {
+            bubble.y = bubble_follow.y-bubble_follow.height-bubble.height;
+            bubble.x = bubble_follow.x;
+            }
     }
 
     var isLost = false;
