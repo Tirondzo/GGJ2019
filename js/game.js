@@ -97,6 +97,7 @@
     var catAnim;
     var catMoving = false;
     var catLastMove = 0;
+    var catMoveDuration = 1;
 
     var reciept;
     var homeGroup = new Array();
@@ -273,6 +274,7 @@
             picking = (game.time.totalElapsedSeconds() - pickingTime < .3);
 
         //MOVEMENT
+        if(gameStage!=6)
         if(!picking)
         if(!sleeping){
             if(cursors.left.isDown){ 
@@ -422,18 +424,43 @@
                 catMoving = true;
                 
                 //catAnim.stop();
-                var catDist = Phaser.Math.distance(homePoint.x, homePoint.y, cat.x, cat.y);
-                var dx = (homePoint.x - cat.x)/catDist * 40;
-                var dy = (homePoint.y - cat.y)/catDist * 40;
+                var catDist = Phaser.Math.distance(homePoint.x-7, homePoint.y+14, cat.x, cat.y);
+                var dx = (homePoint.x -7 - cat.x);
+                var dy = (homePoint.y +14 - cat.y);
+                if(catDist > 110){
+                    dx = dx/catDist * 110;
+                    dy = dy/catDist * 110;
+                    if(Math.abs(dx) > Math.abs(dy)) dy *= 0.1;
+                    else dx *= 0.1;
+                }
+
                 cat.body.velocity.x = dx;
                 cat.body.velocity.y = dy;
                 //var toX = cat.x + dx; var toY = cat.y + dy;
                 //catAnim.stop().to( { x: toX, y: toY }, 3000, Phaser.Easing.Linear.None, false).from({x:cat.x, y:cat.y}).start();
+            }else{
+                cat.play("idle");
             }
         }else if(catMoving){
-            if(game.time.totalElapsedSeconds() - catLastMove > 1){
+            var catDirection = 0;
+            if(Math.abs(cat.body.velocity.x) > Math.abs(cat.body.velocity.y)){
+                if(cat.body.velocity.x < 0) catDirection = 0;
+                else catDirection = 2;
+            }else{
+                if(cat.body.velocity.y < 0) catDirection = 1;
+                else catDirection = 3;
+            }
+            cat.animations.play(["left","up","right","down"][catDirection]);
+            if(game.time.totalElapsedSeconds() - catLastMove > catMoveDuration){
                 catMoving = false;
                 cat.body.velocity.x = cat.body.velocity.y = 0;
+            }
+        }
+
+        if(gameStage == 5){
+            if(Phaser.Math.distanceSq(player.x,player.y,homePoint.x-7,homePoint.y+14) < 400){
+                gameStage = 6;
+                player.body.velocity.x = player.body.velocity.y = 0;
             }
         }
     }
@@ -454,10 +481,10 @@
         var angle = game.rnd.frac()*Phaser.Math.PI2;
         homePoint.set(player.x + Math.cos(angle)*500, player.y + Math.sin(angle)*500);
         homeArea.centerOn(homePoint.x, homePoint.y);
+        homeBase.position.set(homePoint.x, homePoint.y);
+        homeRoof.position.set(homePoint.x, homePoint.y + (128-98));
         homeGroup.forEach(function(val){
             val.visible = true; 
-            val.position.x = homePoint.x;
-            val.position.y = homePoint.y;
         });
     }
 
