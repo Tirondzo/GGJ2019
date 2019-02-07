@@ -298,10 +298,12 @@
         bubble.animations.add('happy',[15,16,17,18,19,20,21,22,23,24,25,26,27,28,29],bubbleSpeed);
         bubble.animations.add('scared',[30,31,32,33,34,35,36,37,38,39,40,41,42,43,44],bubbleSpeed);
         bubble.animations.add('love',[45,46,47,48,49,50,51,52,53,54,55,56,57,58,59],bubbleSpeed);
+        bubble.animations.add('home',[60,61,62,63,64,65,66,67,68,69,70,71,72,73,74],bubbleSpeed);
         bubble.animations.getAnimation('zzz').onComplete.add(function () { bubble.visible=false; }, this);
         bubble.animations.getAnimation('happy').onComplete.add(function () { bubble.visible=false; }, this);
         bubble.animations.getAnimation('scared').onComplete.add(function () { bubble.visible=false; }, this);
         bubble.animations.getAnimation('love').onComplete.add(function () { bubble.visible=false; }, this);
+        bubble.animations.getAnimation('home').onComplete.add(function () { bubble.visible=false; }, this);
         
         
         bubble.visible=false;
@@ -418,7 +420,8 @@
             if(gameStage == 5){
                 if(!protectedArea.centerOn(player.x, player.y).contains(cat.x, cat.y)){
                     findCat();
-                    //findHome();
+                    if(!regenerativeArea.centerOn(player.x, player.y).contains(homePoint.x, homePoint.y))
+                        findHome();
                 } 
             }
         }
@@ -482,15 +485,25 @@
             }
         });
         if(gameStage == 4){
-            findHome();
-            //TODO ADD FADE OUT AND DELAY
-            //gameStage = 5;
+            hud.visible = false;
+
+            var LOOKING_FOR_HOME_TIME = 25;
 
             var inDepression = game.time.totalElapsedSeconds() - depressionTime;
-            var depressionPhase = Math.min(Math.ceil(inDepression/2),6);
+            if (!bubble.visible && (inDepression > 1 && inDepression < 3)) {bubble_follow=player; bubble.visible=true;bubble.animations.play('happy');}
+            if (!bubble.visible && (inDepression > 3 && inDepression < LOOKING_FOR_HOME_TIME) && Math.floor(Math.random()*60*2)===1) {bubble_follow=player; bubble.visible=true;bubble.animations.play('home');}
+
+
+            var depressionPhase = Math.min(Math.ceil((inDepression-LOOKING_FOR_HOME_TIME)/2),6);
             fog.frame = depressionPhase;
             if(depressionPhase == 6){
                 gameStage = 5;
+                findHome();
+            }
+
+            if (inDepression > LOOKING_FOR_HOME_TIME && Math.floor(Math.random()*60*2)===1)
+            {
+            if (!bubble.visible) {bubble_follow=player; bubble.visible=true;bubble.animations.play('scared');}
             }
         }
         if(gameStage == 5){
@@ -541,8 +554,8 @@
         }
 
         if(gameStage == 5){
-            hud.visible = false;
-            if(Phaser.Math.distanceSq(player.x,player.y,homePoint.x-7,homePoint.y+14) < 400){
+            if(Phaser.Math.distanceSq(player.x,player.y,homePoint.x-7,homePoint.y+14) < 400 
+                && Phaser.Math.distanceSq(cat.x,cat.y,homePoint.x-7,homePoint.y+14) < 400 ){
                 gameStage = 6;
                 player.body.velocity.x = player.body.velocity.y = 0;
                 atHomeTime = game.time.totalElapsedSeconds();
@@ -554,6 +567,8 @@
             if(game.time.totalElapsedSeconds() - atHomeTime > 3){
                 gameStage = 7;
                 endImg.alpha = 0;
+
+                console.log("Don't forget about them who waits for you at home...");
             }
         }
 
@@ -575,10 +590,6 @@
             if (!bubble.visible) {bubble_follow=player; bubble.visible=true;bubble.animations.play('zzz');}
             }
 
-        if (gameStage==4 && Math.floor(Math.random()*60*2)===1)
-        {
-        if (!bubble.visible) {bubble_follow=player; bubble.visible=true;bubble.animations.play('scared');}
-        }
         
         
         if (bubble_follow!=null)
